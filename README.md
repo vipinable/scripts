@@ -1,2 +1,2 @@
 # scripts
-Place holder for the scripts for my scripts
+Place holder for my scripts
