@@ -68,8 +68,8 @@ class check:
     output = os.popen(cmd).read()
     state = 'OK'
     str_var = ''
-    for latency in output.split(',')[2:6]: 
-        str_var = str_var + latency.replace('io','').replace('=',' = ').replace('ms','') + ','     
+    for latency in output[:output.find('|')].replace('ms','').replace(' ','').replace('latency','_latency').split(',')[2:]: 
+        str_var = str_var + ' ' + latency.replace('io','').replace('=',' = ')
     return state + ' |' + str_var.rstrip(',')
 
   def health(self,cmd_prefix):
