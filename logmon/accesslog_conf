@@ -1,0 +1,16 @@
+# YAML
+- /var/log/httpd/access_log:
+    http-404:
+      grepat: '^.*\s{1}404\s{1}.*$'
+      ex_pat: '^.*\s{1}200\s{1}.*$'
+      warn: 50
+      crit: 75
+      tst: lt
+      outformat: "G,TotalCount#300#raw,:$time$:,:$data$:,:res_scality,:$source$:,http_errors,404_errors"
+    http-500:
+      grepat: '^.*\s{1}500\s{1}.*$'
+      ex_pat: '^.*\s{1}200\s{1}.*$'
+      warn: 50
+      crit: 75
+      tst: lt
+      outformat: "G,TotalCount#300#raw,:$time$:,:$data$:,:res_scality,:$source$:,http_errors,500_errors"
