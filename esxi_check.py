@@ -149,7 +149,6 @@ if __name__ == "__main__":
 
 #Create first part of perl API command
   cmd_prefix = api + ' -H ' +  options.esxi  + ' -u ' + user + ' -p ' + paswd
-  print cmd_prefix
 
 #Create the class object "check"
   check = check()
@@ -159,7 +158,7 @@ if __name__ == "__main__":
     result_val,result_str = (getattr(check,args[0])(cmd_prefix))
   except:
     print "Oops! something is worng."
-  #  exit(1)
+    exit(1)
 
   if type(result_val) is int:
      state = state(result_val,int(warn),int(crit))
