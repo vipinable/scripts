@@ -1,7 +1,7 @@
 #!/usr/bin/python
-#Wrapper script for esxi monitoring using nagios provided api 
+#Wrapper script for esxi monitoring using nagios provided api
 #blame: Vipin Narayanan (vipin_narayanan@cable.comcast.net,vnaray001v)
-#Version: 1.0 
+#Version: 1.0
 from optparse import OptionParser
 import os
 api = "/usr/lib64/nagios/plugins/check_vmware_api"
@@ -9,39 +9,53 @@ api = "/usr/lib64/nagios/plugins/check_vmware_api"
 #Define the class with all supported functions
 class check:
   def cpuready(self,cmd_prefix):
+    int_var = 0
     cmd = cmd_prefix + ' -l runtime -s list'
     output = os.popen(cmd).read()
-    int_var = 0
-    state = 'OK'
     for vm in output[output.find(':'):output.find('|')].lstrip(':').split(','):
       if vm:
-        vm = vm[:vm.find('(')].strip()
-        cmd = cmd_prefix + ' -l cpu -s ready -N ' + '"' + vm + '"'
-        output = os.popen(cmd).read()
-        int_var = int(output[output.find('='):].split('.')[0].lstrip('=')) + int_var
-    return state + ' | cpu_ready = ' + str(int_var) + 'ms'
+        if 'DOWN' not in vm:
+          vm = vm[:vm.find('(')].strip()
+          cmd = cmd_prefix + ' -l cpu -s ready -N ' + '"' + vm + '"'
+          output = os.popen(cmd).read()
+          int_var = int(output[output.find('='):].split('.')[0].lstrip('=')) + int_var
+    return (int_var,'cpu_ready = ' + str(int_var) + ' | cpu_ready=' + str(int_var))
 
   def cpu(self,cmd_prefix):
     cmd = cmd_prefix + ' -l cpu -s usage'
-    state = 'OK'
     output = os.popen(cmd).read()
     int_var = int(output[output.find('='):].split('.')[0].lstrip('='))
-    return state + ' | cpu_usage = ' + str(int_var) + ' %'
+    return (int_var, 'cpu_usage = ' + str(int_var) + ' | cpu_usage=' + str(int_var))
 
   def mem(self,cmd_prefix):
     cmd = cmd_prefix + ' -l mem -s usage'
-    state = 'OK'
     output = os.popen(cmd).read()
     int_var = int(output[output.find('='):].split('.')[0].lstrip('='))
-    return state + ' | memory_usage = ' + str(int_var) + ' %'
+    return (int_var,'memory_usage = ' + str(int_var) + ' | memory_usage=' + str(int_var))
+
+  def datastore(self,cmd_prefix):
+    cmd = cmd_prefix + ' -l vmfs'
+    output = os.popen(cmd).read()
+    str_var = output[output.find(':'):output.find('|')].lstrip(':')
+    int_var = None
+    for vmfs in str_var.split():
+      if '%' in vmfs:
+        if crit > warn:
+          if int_var == None or int(vmfs[1:3]) > int_var:
+            int_var = int(vmfs[1:3])
+        elif warn > crit:
+          if int_var == None or int(vmfs[1:3]) < int_var:
+            int_var = int(vmfs[1:3])
+        else:
+            int_var = 'OK'
+    return (int_var,''.join(str_var))
 
   def paths(self,cmd_prefix):
     cmd = cmd_prefix + ' -l storage'
-    state = 'OK'
     output = os.popen(cmd).read()
     if output.split()[9].split('/')[0] != output.split()[9].split('/')[1]:
       state = 'CRITICAL'
-    return state + ' | ' + output.split()[9] + ' paths active'
+    return (state,output.split()[9] + ' paths active')
 
   def service(self,cmd_prefix):
     cmd = cmd_prefix + ' -l service'
@@ -61,21 +75,39 @@ class check:
         str_var = str_var + service
         if 'down' in service:
           state = 'CRITICAL'
-    return state + ' | ' + str_var
+    return (state,str_var)
 
   def iolatency(self,cmd_prefix):
     cmd = cmd_prefix + ' -l io'
     output = os.popen(cmd).read()
-    state = 'OK'
     str_var = ''
-    for latency in output[:output.find('|')].replace('ms','').replace(' ','').replace('latency','_latency').split(',')[2:]: 
-        str_var = str_var + ' ' + latency.replace('io','').replace('=',' = ')
-    return state + ' |' + str_var.rstrip(',')
+    for latency in output[:output.find('|')].replace('ms','').replace(' ','').replace('latency','_latency').split(',')[2:]:
+        str_var = str_var + ' ' + latency.replace('io','') + ', '
+    state = output.split()[1]
+    return (state,str_var.rstrip(', '))
 
   def health(self,cmd_prefix):
     cmd = cmd_prefix + ' -l runtime'
-    output = os.popen(cmd).read()      
-    return output.split()[1] + ' |' + output.split(',')[1] + ',' + output.split(',')[4]
+    output = os.popen(cmd).read()
+    state = output.split()[1]
+    return (state,output.split(',')[1] + ',' + output.split(',')[4])
+
+def state(result_val,warn,crit):
+  if crit > warn:
+    if result_val < warn:
+      state = 'OK'
+    elif result_val > warn and result_val < crit:
+      state = 'WARNING'
+    else:
+      state = 'CRITICAL'
+  else:
+    if result_val > warn:
+      state = 'OK'
+    elif result_val < warn and result_val > crit:
+      state = 'WARNING'
+    else:
+      state = 'CRITICAL'
+  return state
 
 if __name__ == "__main__":
 
@@ -89,36 +121,58 @@ if __name__ == "__main__":
   parser = OptionParser(usage)
   parser.add_option("-H", "--host", dest="esxi",
                   help="specify the ESXi hostname")
-  parser.add_option("-u", "--user", dest="user",
-                  help="specify the username to connect ESXi")
-  parser.add_option("-p", "--pass", dest="paswd",
-                  help="specify the password to connect ESXi")
+  parser.add_option("-w", "--warn", dest="warn",
+                  help="specify warning threshould for the check")
+  parser.add_option("-c", "--crit", dest="crit",
+                  help="specify critial threshould for the check")
   (options, args) = parser.parse_args()
 
-#Validate the options handle errors
+#Validate the options and handle errors
   if len(args) != 1:
-    parser.error("No argument specified")
-  if not options.esxi or not options.user or not options.paswd:
-    parser.error("more options required")
+    parser.error("WARNING: No argument specified")
+  if not options.esxi:
+    parser.error("WARNING: more options required")
+#Assign default values
+  crit = options.crit
+  warn = options.warn
+  if crit is None or warn is None:
+    crit = 0
+    warn = 0
+#Set authenticat details
+  user = 'monitor'
+  paswd = 'c0mC@stM0n!t0r'
 
 #Validate the argument and handle errors
-  arg_list = ['cpuready','cpu','mem','paths','service','iolatency','health']
+  arg_list = ['cpuready','cpu','mem','paths','service','iolatency','health','datastore']
   if args[0] not in arg_list:
     parser.error("unknown argument")
 
-#Create first part of perl API command 
-  cmd_prefix = api + ' -H ' +  options.esxi  + ' -u ' + options.user + ' -p ' + options.paswd
+#Create first part of perl API command
+  cmd_prefix = api + ' -H ' +  options.esxi  + ' -u ' + user + ' -p ' + paswd
+  print cmd_prefix
 
 #Create the class object "check"
   check = check()
 
 #Call the specifc function in the class based on the command line argument and print the output
-  result = (getattr(check,args[0])(cmd_prefix))
-  print result
-  if result.split()[0] == 'OK':
+  try:
+    result_val,result_str = (getattr(check,args[0])(cmd_prefix))
+  except:
+    print "Oops! something is worng."
+  #  exit(1)
+
+  if type(result_val) is int:
+     state = state(result_val,int(warn),int(crit))
+     suffix = ';' + str(warn) + ';' + str(crit)
+  else:
+     state = result_val
+     suffix = ''
+  print state + ' - ' + result_str + suffix
+
+  if state == 'OK':
      exit(0)
-  if result.split()[0] == 'WARNING':
+  if state == 'WARNING':
      exit(1)
-  if result.split()[0] == 'CRITICAL':
+  if state == 'CRITICAL':
      exit(2)
 #THE END
