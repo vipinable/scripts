@@ -1,7 +1,7 @@
 #!/usr/bin/python
-#Wrapper script for esxi monitoring using nagios provided api
+#Wrapper script for esxi monitoring using nagios provided api 
 #blame: Vipin Narayanan (vipin_narayanan@cable.comcast.net,vnaray001v)
-#Version: 1.0
+#Version: 1.0 
 from optparse import OptionParser
 import os
 api = "/usr/lib64/nagios/plugins/check_vmware_api"
@@ -42,10 +42,10 @@ class check:
       if '%' in vmfs:
         if crit > warn:
           if int_var == None or int(vmfs[1:3]) > int_var:
-            int_var = int(vmfs[1:3])
+            int_var = int(vmfs[1:3]) 
         elif warn > crit:
           if int_var == None or int(vmfs[1:3]) < int_var:
-            int_var = int(vmfs[1:3])
+            int_var = int(vmfs[1:3])  
         else:
             int_var = 'OK'
     return (int_var,''.join(str_var))
@@ -53,6 +53,7 @@ class check:
   def paths(self,cmd_prefix):
     cmd = cmd_prefix + ' -l storage'
     output = os.popen(cmd).read()
+    state = 'OK'
     if output.split()[9].split('/')[0] != output.split()[9].split('/')[1]:
       state = 'CRITICAL'
     return (state,output.split()[9] + ' paths active')
@@ -79,29 +80,31 @@ class check:
 
   def iolatency(self,cmd_prefix):
     cmd = cmd_prefix + ' -l io'
-    output = os.popen(cmd).read()
+    output = os.popen(cmd).read() 
     str_var = ''
-    for latency in output[:output.find('|')].replace('ms','').replace(' ','').replace('latency','_latency').split(',')[2:]:
+    perf_var = ''
+    for latency in output[:output.find('|')].replace('ms','').replace(' ','').replace('latency','_latency').split(',')[2:]: 
         str_var = str_var + ' ' + latency.replace('io','') + ', '
+        perf_var = perf_var + ' ' + latency.replace('io','') + ';' + str(warn) + ';' + str(crit) +';'
     state = output.split()[1]
-    return (state,str_var.rstrip(', '))
+    return (state,str_var.rstrip(', ') + ' | ' + perf_var)
 
   def health(self,cmd_prefix):
     cmd = cmd_prefix + ' -l runtime'
-    output = os.popen(cmd).read()
+    output = os.popen(cmd).read()      
     state = output.split()[1]
     return (state,output.split(',')[1] + ',' + output.split(',')[4])
 
 def state(result_val,warn,crit):
   if crit > warn:
-    if result_val < warn:
+    if result_val <= warn:
       state = 'OK'
     elif result_val > warn and result_val < crit:
       state = 'WARNING'
     else:
       state = 'CRITICAL'
   else:
-    if result_val > warn:
+    if result_val >= warn:
       state = 'OK'
     elif result_val < warn and result_val > crit:
       state = 'WARNING'
@@ -147,18 +150,18 @@ if __name__ == "__main__":
   if args[0] not in arg_list:
     parser.error("unknown argument")
 
-#Create first part of perl API command
+#Create first part of perl API command 
   cmd_prefix = api + ' -H ' +  options.esxi  + ' -u ' + user + ' -p ' + paswd
 
 #Create the class object "check"
   check = check()
 
 #Call the specifc function in the class based on the command line argument and print the output
-  try:
+  try: 
     result_val,result_str = (getattr(check,args[0])(cmd_prefix))
   except:
     print "Oops! something is worng."
-    exit(1)
+    exit(3)
 
   if type(result_val) is int:
      state = state(result_val,int(warn),int(crit))
