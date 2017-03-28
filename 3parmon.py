@@ -66,12 +66,27 @@ class show:
          break
       if ' t ' in line:
          line = line.strip().split()
-         print "G,IOPS#300#raw," + str(globals()['now']) + "," + str(line[3]) + s + "iops_" + str(line[1])
-         print "G,ThroughputKB/Sec#300#raw," + str(globals()['now']) + "," + str(line[6]) + s + "trupt_" + str(line[1])
-         print "G,ServiceTime#300#raw," + str(globals()['now']) + "," + str(line[9]) + s + "svtime_" + str(line[1])
-         print "G,QueueSize#300#raw," + str(globals()['now']) + "," + str(line[11]) + s + "iosiz_" + str(line[1])
-         print "G,QueueLength#300#raw," + str(globals()['now']) + "," + str(line[13]) + s + "qlen_" + str(line[1])
-         print "G,IdleDisk#300#raw," + str(globals()['now']) + "," + str(line[14]) + s + "idle_" + str(line[1])
+         print "G,IOPS#300#raw," + str(globals()['now']) + "," + str(line[3]) + s + "iops_" + str(line[0])
+         print "G,ThroughputKB/Sec#300#raw," + str(globals()['now']) + "," + str(line[6]) + s + "trupt_" + str(line[0])
+         print "G,ServiceTime#300#raw," + str(globals()['now']) + "," + str(line[9]) + s + "svtime_" + str(line[0])
+         print "G,QueueSize#300#raw," + str(globals()['now']) + "," + str(line[11]) + s + "iosiz_" + str(line[0])
+         print "G,QueueLength#300#raw," + str(globals()['now']) + "," + str(line[13]) + s + "qlen_" + str(line[0])
+         print "G,IdleDisk#300#raw," + str(globals()['now']) + "," + str(line[14]) + s + "idle_" + str(line[0])
+
+  def rclperf(self,storage):
+    cmd = "ssh " + storage + " statport -rcip -ni -iter 1"
+    result = os.popen(cmd).read()
+    s = "," + globals()['spdb_node'] + "," + storage + "," + args[0] + ","
+    for line in result.split('\n'):
+      if '---' in line:
+         break
+      if ' t ' in line:
+         line = line.strip().split()
+         print "G,IOPS#300#raw," + str(globals()['now']) + "," + str(line[2]) + s + "iops_" + str(line[0])
+         print "G,ThroughputKB/Sec#300#raw," + str(globals()['now']) + "," + str(line[5]) + s + "truput_" + str(line[0])
+         print "G,ErrorCount#300#raw," + str(globals()['now']) + "," + str(line[8]) + s + "errors_" + str(line[0])
+         print "G,DropCount#300#raw," + str(globals()['now']) + "," + str(line[9]) + s + "drops_" + str(line[0])
+
 
 if __name__ == "__main__":
 
@@ -89,7 +104,7 @@ if __name__ == "__main__":
     parser.error("WARNING: more options required")
 
 #Validate the argument and handle errors
-  arg_list = ['cpuperf','memperf','portperf','vvperf','pdperf']
+  arg_list = ['cpuperf','memperf','portperf','vvperf','pdperf','rclperf']
   if args[0] not in arg_list:
     parser.error("unknown argument")
 
@@ -99,3 +114,4 @@ if __name__ == "__main__":
 #Create the class object "check"
   show = show()
   getattr(show,args[0])(options.storage)
+
