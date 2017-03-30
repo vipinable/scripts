@@ -1,6 +1,8 @@
 #!/usr/bin/python
 #Wrapper script for esxi monitoring using nagios provided api 
-#blame: Vipin Narayanan (vipin_narayanan@cable.comcast.net,vnaray001v)
+#blame: Vipin Narayanan (vipinable@gmail.com)
+#Version: 1.1
+#  1.)Check skip validation added. 2.)Removed TSM-SSH service check.
 #Version: 1.0 
 from optparse import OptionParser
 import os
@@ -12,6 +14,11 @@ class check:
     int_var = 0
     cmd = cmd_prefix + ' -l runtime -s list'
     output = os.popen(cmd).read()
+    try:
+      if output.split()[10] == 'skipped':
+        return (output.split()[1],output.split(':')[1])
+    except:
+      pass
     for vm in output[output.find(':'):output.find('|')].lstrip(':').split(','):
       if vm:
         if 'DOWN' not in vm:
@@ -24,18 +31,33 @@ class check:
   def cpu(self,cmd_prefix):
     cmd = cmd_prefix + ' -l cpu -s usage'
     output = os.popen(cmd).read()
+    try:
+      if output.split()[10] == 'skipped':
+        return (output.split()[1],output.split(':')[1])
+    except:
+      pass
     int_var = int(output[output.find('='):].split('.')[0].lstrip('='))
     return (int_var, 'cpu_usage = ' + str(int_var) + ' | cpu_usage=' + str(int_var))
 
   def mem(self,cmd_prefix):
     cmd = cmd_prefix + ' -l mem -s usage'
     output = os.popen(cmd).read()
+    try:
+      if output.split()[10] == 'skipped':
+        return (output.split()[1],output.split(':')[1])
+    except:
+      pass
     int_var = int(output[output.find('='):].split('.')[0].lstrip('='))
     return (int_var,'memory_usage = ' + str(int_var) + ' | memory_usage=' + str(int_var))
 
   def datastore(self,cmd_prefix):
     cmd = cmd_prefix + ' -l vmfs'
     output = os.popen(cmd).read()
+    try:
+      if output.split()[10] == 'skipped':
+        return (output.split()[1],output.split(':')[1])
+    except:
+      pass
     str_var = output[output.find(':'):output.find('|')].lstrip(':')
     int_var = None
     for vmfs in str_var.split():
@@ -53,6 +75,11 @@ class check:
   def paths(self,cmd_prefix):
     cmd = cmd_prefix + ' -l storage'
     output = os.popen(cmd).read()
+    try:
+      if output.split()[10] == 'skipped':
+        return (output.split()[1],output.split(':')[1])
+    except:
+      pass
     state = 'OK'
     if output.split()[9].split('/')[0] != output.split()[9].split('/')[1]:
       state = 'CRITICAL'
@@ -61,13 +88,11 @@ class check:
   def service(self,cmd_prefix):
     cmd = cmd_prefix + ' -l service'
     output = os.popen(cmd).read()
+    if output.split()[10] == 'skipped':
+       return (output.split()[1],output.split(':')[1])
     str_var = ''
     state = 'OK'
     for service in output.split(','):
-      if 'TSM-SSH' in service:
-        str_var = str_var + service
-        if 'up' in service:
-          state = 'CRITICAL'
       if 'ntpd' in service:
         str_var = str_var + service
         if 'down' in service:
@@ -81,6 +106,11 @@ class check:
   def iolatency(self,cmd_prefix):
     cmd = cmd_prefix + ' -l io'
     output = os.popen(cmd).read() 
+    try:
+      if output.split()[10] == 'skipped':
+        return (output.split()[1],output.split(':')[1])
+    except:
+      pass
     str_var = ''
     perf_var = ''
     for latency in output[:output.find('|')].replace('ms','').replace(' ','').replace('latency','_latency').split(',')[2:]: 
@@ -92,6 +122,11 @@ class check:
   def health(self,cmd_prefix):
     cmd = cmd_prefix + ' -l runtime'
     output = os.popen(cmd).read()      
+    try:
+      if output.split()[10] == 'skipped':
+        return (output.split()[1],output.split(':')[1])
+    except:
+      pass
     state = output.split()[1]
     return (state,output.split(',')[1] + ',' + output.split(',')[4])
 
@@ -141,9 +176,6 @@ if __name__ == "__main__":
   if crit is None or warn is None:
     crit = 0
     warn = 0
-#Set authenticat details
-  user = 'monitor'
-  paswd = 'c0mC@stM0n!t0r'
 
 #Validate the argument and handle errors
   arg_list = ['cpuready','cpu','mem','paths','service','iolatency','health','datastore']
@@ -157,11 +189,11 @@ if __name__ == "__main__":
   check = check()
 
 #Call the specifc function in the class based on the command line argument and print the output
-  try: 
-    result_val,result_str = (getattr(check,args[0])(cmd_prefix))
-  except:
-    print "Oops! something is worng."
-    exit(3)
+#  try: 
+  result_val,result_str = (getattr(check,args[0])(cmd_prefix))
+#  except:
+#    print "UNKOWN: Oops! something is worng. Host may be in Maintenance Mode"
+#    exit(3)
 
   if type(result_val) is int:
      state = state(result_val,int(warn),int(crit))
